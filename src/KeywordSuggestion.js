@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const KeywordSuggestion = () => {
   const [content, setContent] = useState('');
@@ -8,10 +8,12 @@ const KeywordSuggestion = () => {
   const [suggestedKeywords, setSuggestedKeywords] = useState([]);
   const [highlightedKeywords, setHighlightedKeywords] = useState([]);
 
+  useEffect(() => {
+    calculateSeoScore(optimizedContent);
+  }, [optimizedContent]);
+
   const fetchKeywords = async () => {
     try {
-      console.log("Fetching keywords and optimizing content...");
-  
       const response = await fetch('http://localhost:5000/optimize', {
         method: 'POST',
         headers: {
@@ -27,47 +29,33 @@ const KeywordSuggestion = () => {
       }
   
       const data = await response.json();
-      console.log("Optimized Content Received: ", data.optimizedText);
   
-      setOptimizedContent(data.optimizedText);
-  
-      if (data.unusedKeywords) {
-        setSuggestedKeywords(data.unusedKeywords);
-      } else {
-        setSuggestedKeywords([]);
-      }
-
-      if (data.highlightedKeywords) {
-        setHighlightedKeywords(data.highlightedKeywords);
-      } else {
-        setHighlightedKeywords([]);
-      }
-
-      const lengthFactor = Math.min(content.length / 1000, 1) * 50;
-      const keywordFactor = (data.unusedKeywords?.length === 0) ? 50 : (50 - data.unusedKeywords.length * 5);
-      const calculatedTargetScore = Math.floor(lengthFactor + keywordFactor);
-      setTargetSeoScore(calculatedTargetScore);
+      setOptimizedContent(data.optimizedText || '');
+      setSuggestedKeywords(data.unusedKeywords || []);  // Default to empty array
+      setHighlightedKeywords(data.highlightedKeywords || []);  // Default to empty array
+      setSeoScore(Math.round(data.seoScore || 0));
+      setTargetSeoScore(Math.round(data.targetSeoScore || 0));
   
     } catch (error) {
       console.error("Error fetching keywords:", error);
     }
   };
 
-  const calculateSeoScore = () => {
-    const score = Math.floor(Math.random() * 100);
-    setSeoScore(score);
-    console.log("SEO Score Calculated: ", score);
+  const calculateSeoScore = (text) => {
+    const keywordCount = highlightedKeywords.length;
+    const wordCount = text.split(/\s+/).length;
+    const score = (keywordCount / wordCount) * 100;
+    setSeoScore(Math.round(score));
   };
 
   const handleRewrite = () => {
-    console.log("Optimizing content...");
     fetchKeywords();
-    calculateSeoScore();
   };
 
   const handleKeywordClick = (keyword) => {
     setContent(content + " " + keyword);
     setSuggestedKeywords(suggestedKeywords.filter(kw => kw !== keyword)); 
+    calculateSeoScore(optimizedContent);
   };
 
   const highlightKeywords = (text) => {
@@ -77,6 +65,11 @@ const KeywordSuggestion = () => {
       highlightedText = highlightedText.replace(regex, '<mark>$1</mark>');
     });
     return { __html: highlightedText };
+  };
+
+  const handleContentChange = (e) => {
+    setOptimizedContent(e.target.innerText);
+    calculateSeoScore(e.target.innerText);
   };
 
   return (
@@ -104,14 +97,19 @@ const KeywordSuggestion = () => {
       />
 
       <h3 style={styles.subtitle}>Optimized Content (Editable):</h3>
-      <div style={styles.optimizedContentBox} dangerouslySetInnerHTML={highlightKeywords(optimizedContent)} />
+      <div 
+        style={styles.optimizedContentBox} 
+        contentEditable 
+        dangerouslySetInnerHTML={highlightKeywords(optimizedContent)} 
+        onInput={handleContentChange}
+      />
 
       <h3 style={styles.subtitle}>Target SEO Score: {targetSeoScore}</h3>
       <h3 style={styles.subtitle}>Your Current SEO Score: {seoScore}</h3>
 
       <h3 style={styles.subtitle}>Suggested Keywords (Click to Insert):</h3>
       <ul>
-        {suggestedKeywords.map((keyword, index) => (
+        {suggestedKeywords.length > 0 ? suggestedKeywords.map((keyword, index) => (
           <li 
             key={index} 
             onClick={() => handleKeywordClick(keyword)} 
@@ -119,7 +117,7 @@ const KeywordSuggestion = () => {
           >
             {keyword}
           </li>
-        ))}
+        )) : <li>No keywords to suggest.</li>}
       </ul>
 
       <p style={styles.seoText}>The higher the SEO score, the better optimized your content is for search engines.</p>
@@ -161,11 +159,6 @@ const styles = {
     borderRadius: '5px',
     cursor: 'pointer',
   },
-  seoText: {
-    fontSize: '16px',
-    color: '#333',
-    marginTop: '10px',
-  },
   optimizedContentBox: {
     width: '80%',
     padding: '10px',
@@ -174,6 +167,11 @@ const styles = {
     backgroundColor: '#fff',
     fontSize: '16px',
     whiteSpace: 'pre-wrap',
+  },
+  seoText: {
+    fontSize: '16px',
+    color: '#333',
+    marginTop: '10px',
   },
   keyword: {
     cursor: 'pointer',
