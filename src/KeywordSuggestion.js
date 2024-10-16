@@ -4,7 +4,7 @@ const KeywordSuggestion = () => {
   const [content, setContent] = useState('');
   const [optimizedContent, setOptimizedContent] = useState('');
   const [seoScore, setSeoScore] = useState(0);
-  const [targetSeoScore, setTargetSeoScore] = useState(0);  
+  const [targetSeoScore, setTargetSeoScore] = useState(0);
   const [suggestedKeywords, setSuggestedKeywords] = useState([]);
   const [highlightedKeywords, setHighlightedKeywords] = useState([]);
 
@@ -42,7 +42,7 @@ const KeywordSuggestion = () => {
       } else {
         setHighlightedKeywords([]);
       }
-  
+
       const lengthFactor = Math.min(content.length / 1000, 1) * 50;
       const keywordFactor = (data.unusedKeywords?.length === 0) ? 50 : (50 - data.unusedKeywords.length * 5);
       const calculatedTargetScore = Math.floor(lengthFactor + keywordFactor);
@@ -51,7 +51,7 @@ const KeywordSuggestion = () => {
     } catch (error) {
       console.error("Error fetching keywords:", error);
     }
-  };  
+  };
 
   const calculateSeoScore = () => {
     const score = Math.floor(Math.random() * 100);
