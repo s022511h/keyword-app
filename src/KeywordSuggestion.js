@@ -5,12 +5,12 @@ const KeywordSuggestion = () => {
   const [optimizedContent, setOptimizedContent] = useState('');
   const [seoScore, setSeoScore] = useState(0);
   const [targetSeoScore, setTargetSeoScore] = useState(0);
-  const [suggestedKeywords, setSuggestedKeywords] = useState([]);
   const [highlightedKeywords, setHighlightedKeywords] = useState([]);
+  const [suggestedKeywords, setSuggestedKeywords] = useState([]);
 
   useEffect(() => {
     calculateSeoScore(optimizedContent);
-  }, [optimizedContent]);
+  }, [optimizedContent, highlightedKeywords]);
 
   const fetchKeywords = async () => {
     try {
@@ -23,39 +23,38 @@ const KeywordSuggestion = () => {
           text: content
         }),
       });
-  
+
       if (!response.ok) {
         throw new Error(`Error: ${response.status}`);
       }
-  
+
       const data = await response.json();
-  
+      
       setOptimizedContent(data.optimizedText || '');
-      setSuggestedKeywords(data.unusedKeywords || []);  // Default to empty array
-      setHighlightedKeywords(data.highlightedKeywords || []);  // Default to empty array
-      setSeoScore(Math.round(data.seoScore || 0));
+      setHighlightedKeywords(data.highlightedKeywords || []);
+      setSeoScore(Math.round(data.currentSeoScore || 0));
       setTargetSeoScore(Math.round(data.targetSeoScore || 0));
-  
+      setSuggestedKeywords(data.highlightedKeywords);
+
     } catch (error) {
       console.error("Error fetching keywords:", error);
     }
   };
 
   const calculateSeoScore = (text) => {
-    const keywordCount = highlightedKeywords.length;
     const wordCount = text.split(/\s+/).length;
-    const score = (keywordCount / wordCount) * 100;
+    const keywordCount = highlightedKeywords.reduce((count, keyword) => {
+      const keywordMatches = (text.match(new RegExp(`\\b${keyword}\\b`, 'gi')) || []).length;
+      return count + keywordMatches;
+    }, 0);
+
+    // Ensure the current SEO score meets or exceeds the target SEO score
+    const score = Math.min((keywordCount / wordCount) * 100, targetSeoScore); // Cap at target SEO score
     setSeoScore(Math.round(score));
   };
 
   const handleRewrite = () => {
     fetchKeywords();
-  };
-
-  const handleKeywordClick = (keyword) => {
-    setContent(content + " " + keyword);
-    setSuggestedKeywords(suggestedKeywords.filter(kw => kw !== keyword)); 
-    calculateSeoScore(optimizedContent);
   };
 
   const highlightKeywords = (text) => {
@@ -70,6 +69,12 @@ const KeywordSuggestion = () => {
   const handleContentChange = (e) => {
     setOptimizedContent(e.target.innerText);
     calculateSeoScore(e.target.innerText);
+  };
+
+  const addKeywordToContent = (keyword) => {
+    setContent(prevContent => prevContent + " " + keyword);
+    setOptimizedContent(prevOptimized => prevOptimized + " " + keyword);
+    calculateSeoScore(optimizedContent + " " + keyword);
   };
 
   return (
@@ -107,18 +112,14 @@ const KeywordSuggestion = () => {
       <h3 style={styles.subtitle}>Target SEO Score: {targetSeoScore}</h3>
       <h3 style={styles.subtitle}>Your Current SEO Score: {seoScore}</h3>
 
-      <h3 style={styles.subtitle}>Suggested Keywords (Click to Insert):</h3>
-      <ul>
-        {suggestedKeywords.length > 0 ? suggestedKeywords.map((keyword, index) => (
-          <li 
-            key={index} 
-            onClick={() => handleKeywordClick(keyword)} 
-            style={styles.keyword}
-          >
+      <h3 style={styles.subtitle}>Suggested Keywords:</h3>
+      <div>
+        {suggestedKeywords.map((keyword, index) => (
+          <button key={index} style={styles.keywordButton} onClick={() => addKeywordToContent(keyword)}>
             {keyword}
-          </li>
-        )) : <li>No keywords to suggest.</li>}
-      </ul>
+          </button>
+        ))}
+      </div>
 
       <p style={styles.seoText}>The higher the SEO score, the better optimized your content is for search engines.</p>
     </div>
@@ -173,12 +174,14 @@ const styles = {
     color: '#333',
     marginTop: '10px',
   },
-  keyword: {
+  keywordButton: {
+    margin: '5px',
+    padding: '8px 12px',
+    backgroundColor: '#2196F3',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
     cursor: 'pointer',
-    textDecoration: 'none',
-    fontSize: '16px',
-    marginBottom: '10px',
-    listStyleType: 'none',
   }
 };
 
